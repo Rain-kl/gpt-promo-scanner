@@ -1,405 +1,115 @@
-# ChatGPT Team (Business) 促销码自动扫描工具
+# Promo Scanner · 本机扫描工作台
 
 **简体中文** | [English](README_EN.md)
 
-[![LINUX DO](https://img.shields.io/badge/LINUX-DO-FFB003?style=flat-square)](https://linux.do/t/topic/2156521)
+为现有 ChatGPT Business 促销码扫描脚本提供一个中文前端面板：在页面配置连接、控制任务、查看实时执行数据和导出结果。
 
-> 原创研究首发于 [Linux Do 社区](https://linux.do/t/topic/2156521)（一级用户才可查看）
+界面遵循 [Impeccable](https://github.com/pbakaus/impeccable) 的操作型界面指导。后端使用 FastAPI，前端使用原生 HTML/CSS/JavaScript，Python 依赖统一由 **uv + pyproject.toml + uv.lock** 管理，无需 Node 或前端构建步骤。
 
-ChatGPT Team（现 ChatGPT Business）标准价 $50/月（2 人）。OpenAI 给部分渠道合作伙伴发放了促销码，可以 40%~71% 折扣。
+## 快速启动
 
-本项目提供一套完整的批量发现、验证、比价、支付工具链。跟着下面的流程一步步操作即可。
-
----
-
-## 目录
-
-- [前置准备](#前置准备)
-- [第一步：生成候选码](#第一步生成候选码)
-- [第二步：批量验证](#第二步批量验证)
-- [第三步：收集价格](#第三步收集价格)
-- [第四步：一键支付](#第四步一键支付)
-- [结果解读](#结果解读)
-- [实战技巧](#实战技巧)
-- [踩坑记录](#踩坑记录)
-- [文件说明](#文件说明)
-
----
-
-## 前置准备
-
-### 需要的环境
-
-- **Clash Verge**（或兼容 Clash API 的代理客户端）— 用于切换不同国家的代理节点
-- **Python 3.9+**
-- **ChatGPT 账号**（免费版即可，不需要订阅）
-
-### 1. 安装项目
+需要 [uv](https://docs.astral.sh/uv/getting-started/installation/) 和 Python 3.11+；仓库默认选择 Python 3.12。
 
 ```bash
-git clone https://github.com/JUk1-GH/gpt-promo-scanner.git
+git clone https://github.com/Rain-kl/gpt-promo-scanner.git
 cd gpt-promo-scanner
-pip install -r requirements.txt
+uv sync --frozen
+uv run python -m promo_dashboard
 ```
 
-### 2. 配置 Clash
-
-确保 Clash Verge 正在运行，脚本默认连接 `/tmp/verge/verge-mihomo.sock`（Unix socket）。
-
-如果路径不同，修改 `config.toml` 中的 socket 配置。
-
-### 3. 获取 accessToken
-
-ChatGPT 的 API 需要登录凭证，通过浏览器获取：
-
-**方法一（推荐）**：浏览器打开以下地址，在页面显示的 JSON 中找到 `accessToken` 字段：
-```
-https://chatgpt.com/api/auth/session
-```
-
-**方法二**：在 chatgpt.com 按 F12 → Console，执行：
-```javascript
-const s = await (await fetch('/api/auth/session')).json();
-console.log(s.accessToken);
-```
-
-会输出一串以 `eyJ` 开头的字符串，复制它。
-
-### 4. 配置 Token
+在本机浏览器输入 `http://127.0.0.1:8765`。更换端口可以运行：
 
 ```bash
-cp config.toml.example config.toml
+uv run python -m promo_dashboard --port 8888
 ```
 
-编辑 `config.toml`，把刚才获取的 token 填入：
+**首次使用无需改配置文件。** 可以先在工作台点击「预览候选」，无需 Token 或 Clash；需要真实扫描时，再进入「连接设置」填写凭据和代理并保存。
 
-```toml
-[openai]
-token = "eyJhbGciOi..."
-```
+## 面板功能
 
-> ⚠️ Token 有有效期（几小时到几天），过期后所有验证都会返回 `invalid_code`。每次跑脚本前如果发现全部是 `not found`，先去重新获取 token。
+| 页面 | 用途 |
+|---|---|
+| 扫描工作台 | 选择任务类型和地区、预览候选、开始任务、暂停/继续/停止 |
+| 执行结果 / 运行日志 | 查看真实处理进度、可用/存在/异常/跳过统计、耗时、逐条结果和增量日志 |
+| 任务记录 | 回看任务、结果和日志，删除已结束的记录 |
+| 已知码库 | 搜索、按地区筛选并复制仓库历史参考码 |
+| 连接设置 | 页面配置所有连接参数、任务默认值及候选来源 |
 
----
+结果支持搜索、状态筛选、分页和 **JSON / CSV 导出**。导出遵循当前筛选条件；扫描成功生成的结账链接可从结果表中打开。
 
-## 第一步：生成候选码
+### 三种任务
 
-根据目前已发现的码，大部分遵循这个命名规律：
+- **候选发现**：组合公司基础名和国家后缀，调用 eligibility API 判断 `ELIGIBLE`、`EXISTS` 和 `NOT_FOUND`。英国同时尝试 `gb` / `uk`。
+- **已知码扫描**：验证内置码和自定义码，可切换地区节点并收集折扣、估算价格和结账链接。
+- **矩阵发现**：将公司名与所选地区交叉组合，同时尝试无后缀码。相同候选自动去重。
 
-```
-公司名(全小写去空格) + ISO 国家码(小写)
-```
+每种任务都可以「预览候选」；预览只生成待验证列表，不发送外部请求。发现和矩阵任务使用当前出站连接，地区用于生成候选后缀；需要切换地区节点验证时使用「已知码扫描」。单个任务上限为 5000 个候选，避免误启动过大的任务。
 
-例如：`thinkingmachines` + `th` = `thinkingmachinesth`
+### 全部设置在页面完成
 
-但**不是绝对的**，存在明显例外：
-- 有的码**没有国家后缀**（如 `firstfocus`，没有 AU）
-- UK 码后缀不统一，有的用 `uk`（`talentgeniusuk`），有的用 `gb`（`aibuildgroupgb`）
-- 可能还有其他未发现的命名变体
+- ChatGPT Access Token：支持更新和显式清除；留空保留已有值。
+- 出站代理：HTTP / HTTPS / SOCKS5；留空直连，面板设置优先于继承的代理环境变量。
+- Clash：Unix Socket 或 HTTP API、API 密钥、Rule / Global 模式代理组、自动切换开关、各地区节点匹配关键字。
+- 执行选项：请求间隔、请求超时、默认任务和地区、是否收集价格。
+- 候选来源：内置公司基础名、内置公司列表、自定义完整候选码和基础名。
 
-### 从哪找公司名单
+Token 可从登录后的 ChatGPT 会话页面获取。真实请求会验证 Token；认证失败、限流或连续连接异常会结束任务并显示原因，而不会把这些失败当成「促销码不存在」。
 
-有促销码的公司通常符合以下特征：
+Clash 控制器需要能从**运行面板的机器**访问。候选发现和预览不要求控制器；已知码扫描关闭自动切换后也可以使用当前出站连接。「检查已保存的连接」验证控制器连通性，并显示 Token 是否配置；Token 有效性在真实任务开始前验证。
 
-- **中小型 MSP（托管服务提供商）**，为中小企业提供 IT 支持
-- **AI 工具公司**，特别是做 Chrome 插件、SaaS 产品的
-- **区域性公司**，在一个或几个国家有业务
+### 控制和数据保存
 
-**确定不包含**：大型咨询公司（Accenture、Deloitte、McKinsey）、大型 MSP（SearchKings）、大型 IT 企业（Samsung SDS）。
+同一时间只执行一个任务，避免代理节点相互干扰。暂停会在当前请求结束后的检查点生效；停止会中断执行并保留已有结果。正常结束或取消时会尝试恢复原 Clash 节点；强制终止时应自行检查 Clash 当前节点。
 
-### 方法一：用已知 base name 全矩阵扫描
+配置、凭据、任务摘要、日志和增量结果保存在被 Git 忽略的 `.dashboard/`，数据库权限为 `0600`。凭据不会从配置接口回显，也会从任务日志、结果和导出中脱敏。凭据在本机数据库中保存，因此应保护工作目录和备份。
 
-项目内置了目前已发现的 9 个 base name，可以直接对它们做全矩阵交叉扫描（base name × 34 个国家）：
+面板默认仅监听回环地址，包含来源检查和 Host 校验，适用于本机单用户。服务关闭会停止自己启动的执行进程；意外重启后，未结束任务标为「服务中断」，已经保存的结果仍可查看。
+
+历史码库明确显示仓库数据的更新时间，**不表示当前仍然有效**。价格沿用原扫描逻辑的估算，包含汇率与基价假设；最终金额以结账页为准，面板不会自动完成付款。
+
+## 开发与验证
 
 ```bash
-python discover_codes.py --cross
+uv sync --frozen
+uv run pytest -q
+uv run ruff check promo_dashboard tests config.py
+uv run ruff format --check promo_dashboard tests config.py
+node --check promo_dashboard/static/app.js
 ```
 
-脚本会自动组合所有已知公司名 × 所有国家，逐个调 API 验证。这是最快发现新码的方式。
-
-### 方法二：自己准备公司名单
-
-把你认为可能有码的公司名列出来，按规则生成候选码，丢给脚本扫描。
-
-也可以用 AI 帮你生成公司名单，提示词参考：
-
-> 我正在寻找 ChatGPT Business 的促销码，命名规则是 `公司名全小写去空格 + 国家代码`。请帮我列出一些可能获得 OpenAI 促销码的 MSP 或 AI 工具公司，特别是：
-> 1. 做 Chrome 插件的 AI 公司
-> 2. 中小型 IT 服务商
-> 3. 区域性 MSP
-
-### discover_codes.py 用法详解
+浏览器验证使用 Chromium，只执行离线候选预览，不需要真实 Token：
 
 ```bash
-# 扫描指定地区（如英国 GB），使用内置的 base name 列表
-python discover_codes.py GB
-
-# 在扫描时额外添加自定义码（可以跟 --cross 一起用）
-python discover_codes.py GB --add "mycompanygb"
-
-# 全矩阵扫描：所有已知 base name × 所有国家
-python discover_codes.py --cross
-
-# 跟 --cross 时，额外添加自定义 base name 一起扫
-python discover_codes.py --cross --add-base "mycompany"
-
-# 预览候选码（不跑验证，只展示会扫哪些）
-python discover_codes.py GB --preview
-
-# 扫描完成后自动调用 auto_scan.py 收集价格
-python discover_codes.py GB --auto-scan
-
-# 列出脚本支持的国家列表
-python discover_codes.py --list
+# 浏览器驱动已在 dev 依赖中；首次使用可安装 Chromium
+uv run playwright install chromium
+uv run python tests/browser_smoke.py
 ```
 
-结果会按 `ELIGIBLE`（可用）、`EXISTS`（存在但地区不匹配）、`not found`（不存在）三类保存到文件。
+浏览器脚本优先使用本机 Chromium，也支持 Playwright 安装的浏览器。验证覆盖页面配置、预览、筛选、导出、任务历史、暂停/继续/停止及手机宽度布局。截图保存在被忽略的 `test-artifacts/`。
 
----
-
-## 第二步：批量验证
-
-候选码生成完毕后，用 `auto_scan.py` 进行全自动扫描验证。
-
-这个脚本会自动：
-1. 检测 Clash 模式和代理组
-2. 按地区匹配节点关键字
-3. 切换节点 → 测延迟 → 调 checkout API → 收集结果
-
-### 扫描指定地区
+原 CLI 保留，可通过 uv 调用；例如：
 
 ```bash
-# 只扫描英国 GB
-python auto_scan.py GB
-
-# 跳过价格收集（只验证是否存在，更快）
-python auto_scan.py GB --no-price
+uv run python auto_scan.py --list
+uv run python discover_codes.py --list
 ```
 
-适用于：你有明确的目标地区，或者只想确认刚发现的码是否能用。
+旧 CLI 的环境变量 / TOML 配置仍兼容；面板任务使用页面中保存的独立配置快照，修改设置只影响新任务。
 
-### 全自动扫描所有地区
+## 主要文件
 
-```bash
-python auto_scan.py
+```text
+pyproject.toml / uv.lock     Python 项目声明与可复现依赖
+promo_dashboard/app.py      页面、配置和任务 API
+promo_dashboard/manager.py  子进程生命周期与事件持久化
+promo_dashboard/worker.py   扫描执行、进度事件、暂停检查点
+promo_dashboard/storage.py 本机 SQLite 存储
+promo_dashboard/static/    原生前端、样式、本地字体
+config.py                  旧 CLI 兼容配置及面板运行时快照
+auto_scan.py               已有结账/价格/Clash 扫描逻辑
+discover_codes.py          已有候选生成逻辑
+known_codes.json           仓库历史参考码库
+tests/                     API、执行器及浏览器验证
 ```
 
-脚本会遍历所有支持的地区，自动切换 Clash 节点，逐个验证并收集结果。这是最常用的模式。
-
-### 扫描结果
-
-```
-扫描完成！结果已保存到：
-- stripe_urls.txt — 所有可用的 Stripe 支付链接
-- scan_results.json — 结构化 JSON 结果
-
-共发现 X 个可用码（ELIGIBLE）
-共发现 Y 个存在码（EXISTS）
-```
-
-### 其他选项
-
-```bash
-# 查看支持的地区列表
-python auto_scan.py --list
-
-# 扫描后自动用浏览器打开 Stripe 支付页面
-python auto_scan.py GB --open
-```
-
----
-
-## 第三步：收集价格
-
-`auto_scan.py` 默认会在验证后自动调用 metadata API 获取折扣信息，并实时换算美元价格。
-
-```
-code: thinkingmachinesth
-  ✅ ELIGIBLE
-  折扣: ฿999/月 off (≈ $17/人)
-  2 人实付: ฿561/月 (≈ $17)
-```
-
-### 关于价格的重要说明
-
-**官网标价是含税价，Stripe 用不含税价计算折扣。**
-
-例如德国的标价是 €26/seat（含 19% VAT），但 Stripe 内部用 €26 ÷ 1.19 = €21.85/seat 作为 base price。直接用官网标价算实付会差很多。
-
-**正确做法**：看 Stripe 支付页面的 pre-tax 金额。也可以在支付时修改账单地址到免税地区，免去税费。
-
-> 注：脚本收集的价格是 API 返回的折扣值，并非最终实付。最准确的方式是直接打开 Stripe 页面查看。
-
----
-
-## 第四步：一键支付
-
-找到有效的促销码后，用 `open_stripe.py` 生成支付链接。
-
-这个脚本完全独立，复制出去单独放也能用，只需要 curl_cffi 依赖。
-
-### 用法
-
-```bash
-python3 open_stripe.py <促销码> <国家码> <accessToken>
-```
-
-需要三个参数：
-1. **促销码** — 要使用的码
-2. **国家码** — 对应节点的 ISO 国家码（大写）
-3. **accessToken** — 从 chatgpt.com 获取的登录凭证（`eyJ...`）
-
-### 示例
-
-```bash
-# 泰国节点
-python3 open_stripe.py thinkingmachinesth TH eyJhbGciOi...
-
-# 德国节点
-python3 open_stripe.py codestonede DE eyJhbGciOi...
-
-# 美国节点
-python3 open_stripe.py wildmangous US eyJhbGciOi...
-```
-
-### 输出
-
-```
-🔗 thinkingmachinesth  [TH]
-
-✅ 链接已生成，复制到浏览器打开：
-https://checkout.stripe.com/c/pay/cs_xxx...
-```
-
-把链接复制到浏览器打开，确认折扣金额后即可付款。
-
-> ⚠️ 每次使用前需先切换到对应国家的 Clash 节点。例如用 TH 码就先切到泰国节点。
-
----
-
-## 结果解读
-
-API 返回三种结果：
-
-| 结果 | 含义 | 怎么办 |
-|------|------|--------|
-| `ELIGIBLE` | 可用，当前账号可直接付 | 直接生成 Stripe 链接支付 |
-| `EXISTS` | 码存在，但当前节点地区不匹配 | 切到对应国家的节点再试 |
-| `not found` | 不存在（或 token 过期） | 先确认 token 有效，再尝试其他公司名 |
-
-### 为什么没有 ELIGIBLE？
-
-`ELIGIBLE` 取决于你的 ChatGPT 账号地区和当前 Clash 节点的匹配度：
-
-- 如果你的账号是 US 地区，切到 US 节点后 US 码可能就是 `ELIGIBLE`
-- 切换到其他地区节点后，对应的本地化码可能变成 `ELIGIBLE`
-- 同一账号对不同地区码的 `ELIGIBLE` 状态可能不同
-
-大部分情况下，只要能拿到 `EXISTS` 就说明码是真实的，只是需要切对节点才能支付。
-
----
-
-## 实战技巧
-
-### 1. 找到更多公司名
-
-有促销码的通常是中小型公司，不是大企业。试试这些思路：
-
-- 搜索 "ChatGPT Team promo code" + AI 工具名
-- 关注各国家的中小型 MSP 名单
-- TG 上的一些优惠频道偶尔会流出新码
-- 让 AI 帮你生成可能有合作的公司名单
-
-### 2. 先验证一个再批量
-
-```bash
-# 先用 verify.py 单测一个码
-# 或者直接用 discover_codes.py 跑单个地区
-python discover_codes.py GB --preview
-```
-
-确保 Token 有效、Clash 正常工作后，再跑全量扫描。
-
-### 3. 交叉扫描发现更多
-
-发现一个新的 base name 后，用 `--cross` 做全矩阵扫描：
-
-```bash
-python discover_codes.py --cross --add-base "newcompany"
-```
-
-如果新公司跟已知公司有类似的多国业务模式，很可能在其他国家也有码。
-
-### 4. 分步扫描避免被封
-
-不要一次性扫太多请求。建议节奏：
-
-1. 先跑 `--cross` 快速筛选（只调 eligibility API）
-2. 把 `EXISTS` 的码整理出来
-3. 分批用 `auto_scan.py` 收集价格
-
-### 5. 及时更新 Token
-
-Token 过期后所有请求都返回 `invalid_code`，会把有效码误判为不存在。可以设置 cron 定期获取新 token。
-
----
-
-## 踩坑记录
-
-### 1. CRN 报道的合作伙伴全部无效
-初始按 OpenAI 公开合作的 MSP 公司名枚举，SearchKings、Samsung SDS 等全部没有促销码。公共合作伙伴 ≠ 有促销码的合作伙伴。
-
-### 2. 跑大量请求前必须先测一个
-一次生成 1286 个候选码直接开跑，全部被 Cloudflare 拉黑。任何批量操作前必须先用单个请求测试 API 可用性。
-
-### 3. Clash 全局模式 vs 规则模式
-脚本早期硬编码 `🤖 AI` 代理组，但 Clash 在 global 模式下 ChatGPT 流量走 `GLOBAL` 组，导致节点切换不生效。现已支持动态检测。
-
-### 4. UK 国家后缀不统一
-`talentgeniusuk` 有效但 `talentgeniusgb` 不存在；`aibuildgroupgb` 有效但 `aibuildgroupuk` 不存在。对 UK 必须两种后缀都试。
-
-### 5. Cloudflare 限速
-连续 ~50 个请求后 Cloudflare 开始拦截。脚本内置了间隔控制和自动切换节点机制，但如果仍遇到，手动放慢节奏。
-
-### 6. 折扣是 per-seat 值
-Metadata API 返回的 `discount.value` 是每席位的折扣，2 席位时实际省 = value × 2。
-
-### 7. 促销码有有效期
-部分码（如 `geccogb`、`codestonegb`）曾经可用，现已过期。码一旦过期就是永久失效，不可恢复。
-
-### 8. pricing-data.js 含税 ≠ Stripe 不含税价
-官网标价是含税价（含 VAT/GST），Stripe checkout 底层用不含税价计算折扣。不同国家 VAT 不同（DE 19%、FR 20%、GB 20%）。直接看 Stripe 页面的 pre-tax 金额最准，或者改账单地址到免税地区。
-
-### 9. Token 过期导致全部 false negative（最大坑）
-ChatGPT accessToken 有有效期（通常几小时到几天），过期后 eligibility API 对**任何码都返回 `invalid_code`**。在过期 token 下跑的大批量扫描，所有结果都是假的"不存在"。
-
-**教训**：
-- 每次跑扫描前脚本会自动验证 token（用已知有效码调 eligibility API）
-- 如果验证失败会打印 `❌ Token 验证失败` 并退出
-- 此时需重新从 chatgpt.com F12 Console 获取新 token
-
----
-
-## 文件说明
-
-| 文件 | 用途 |
-|------|------|
-| `auto_scan.py` | 全自动扫描 + 价格收集（第二步、第三步用） |
-| `discover_codes.py` | 批量发现新促销码（第一步用） |
-| `open_stripe.py` | 一键生成 Stripe 付款链接，完全独立可复制（第四步用） |
-| `verify.py` | 手动验证单个码是否存在（快速测试用） |
-| `config.py` | 配置读取模块 |
-| `config.toml.example` | 配置模板 |
-| `known_codes.json` | 已知有效码数据库（本地使用，不提交到 git） |
-
----
-
-## Star 趋势
-
-[![Star History Chart](https://api.star-history.com/svg?repos=JUk1-GH/gpt-promo-scanner&type=Date)](https://star-history.com/#JUk1-GH/gpt-promo-scanner&Date)
-
----
-
-## 许可
-
-[MIT](LICENSE)
+[MIT](LICENSE) · Manrope 字体使用 [SIL Open Font License](promo_dashboard/static/fonts/OFL.txt)。

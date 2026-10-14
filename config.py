@@ -1,7 +1,8 @@
 """
 ChatGPT Team 促销码扫描工具 — 配置模块
 
-配置优先级: 环境变量 > config.toml > 默认值
+CLI 配置优先级: 环境变量 > config.toml > 默认值
+面板任务使用启动时的配置快照，优先于环境变量与旧配置文件。
 
 必要配置:
   - OPENAI_TOKEN: ChatGPT accessToken（从浏览器 F12 获取）
@@ -10,16 +11,25 @@ ChatGPT Team 促销码扫描工具 — 配置模块
   - CLASH_SOCKET: Clash Verge Unix socket 路径
   - HTTP_PROXY: HTTP 代理地址
 """
+
 import os
-try:
-    import tomllib  # Python 3.11+
-except ModuleNotFoundError:
-    import tomli as tomllib  # Python < 3.11, pip install tomli
+import tomllib
 from pathlib import Path
 
 CONFIG_FILE = Path(__file__).parent / "config.toml"
 
 _config = {}
+_runtime = None
+
+
+def apply_runtime_settings(settings):
+    """Apply an isolated worker's dashboard snapshot without changing CLI configuration."""
+    global _runtime
+    _runtime = dict(settings)
+
+
+def get_runtime_setting(name, default=None):
+    return _runtime.get(name, default) if _runtime is not None else default
 
 
 def _load_config():
@@ -40,6 +50,11 @@ def _load_config():
 
 def get_token() -> str:
     """获取 OpenAI accessToken"""
+    if _runtime is not None:
+        token = _runtime.get("token", "")
+        if token:
+            return token
+        raise ValueError("请在面板的「连接设置」中保存 ChatGPT Access Token")
     # 1. 环境变量
     token = os.getenv("OPENAI_TOKEN")
     if token:
@@ -67,6 +82,8 @@ def get_token() -> str:
 
 def get_clash_socket() -> str:
     """获取 Clash Verge Unix socket 路径"""
+    if _runtime is not None:
+        return _runtime["clash_socket"]
     env = os.getenv("CLASH_SOCKET")
     if env:
         return env
@@ -76,7 +93,14 @@ def get_clash_socket() -> str:
 
 def get_proxy_url() -> str:
     """获取 HTTP 代理地址"""
-    env = os.getenv("HTTP_PROXY") or os.getenv("http_proxy") or os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+    if _runtime is not None:
+        return _runtime["proxy_url"]
+    env = (
+        os.getenv("HTTP_PROXY")
+        or os.getenv("http_proxy")
+        or os.getenv("HTTPS_PROXY")
+        or os.getenv("https_proxy")
+    )
     if env:
         return env
     cfg = _load_config()
@@ -87,6 +111,8 @@ def get_proxy_group(mode: str) -> str:
     """根据 Clash 模式返回对应的代理组名
     rule → 🤖 AI    global → GLOBAL
     """
+    if _runtime is not None:
+        return _runtime["global_group" if mode == "global" else "rule_group"]
     cfg = _load_config()
     groups = cfg.get("clash", {}).get("proxy_groups", {})
     if mode == "global":

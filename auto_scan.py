@@ -37,7 +37,7 @@ import config
 
 CLASH_SOCKET = config.get_clash_socket()
 PROXY_URL = config.get_proxy_url()
-REQUEST_DELAY = 0.8
+REQUEST_DELAY = config.get_runtime_setting("request_delay", 0.8)
 OUTPUT_DIR = config.get_output_dir()
 
 # ─── 地区定义 ────────────────────────────────────────────────
@@ -176,11 +176,15 @@ def fetch_exchange_rates():
     if _exchange_rates:
         return _exchange_rates
     try:
-        import urllib.request
-        resp = urllib.request.urlopen(
-            "https://open.er-api.com/v6/latest/USD", timeout=10
-        )
-        data = json.loads(resp.read())
+        with _make_session() as session:
+            resp = session.get(
+                "https://open.er-api.com/v6/latest/USD",
+                timeout=config.get_runtime_setting("request_timeout", 10),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        if not isinstance(data.get("rates"), dict) or not data["rates"].get("USD"):
+            raise ValueError("Invalid exchange rate response")
         _exchange_rates = data["rates"]
         return _exchange_rates
     except Exception:
@@ -205,17 +209,15 @@ def to_usd(amount, currency):
 # ─── Clash API ───────────────────────────────────────────────
 
 def _curl(path, method="GET", data=None):
-    url = f"http://localhost{path}"
-    cmd = ["curl", "-s", "--unix-socket", CLASH_SOCKET]
-    if method != "GET":
-        cmd += ["-X", method]
-    if data:
-        cmd += ["-H", "Content-Type: application/json", "-d", json.dumps(data)]
-    cmd.append(url)
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-    if r.returncode != 0:
-        raise RuntimeError(f"curl error: {r.stderr}")
-    return r.stdout
+    from promo_dashboard.network import controller_request
+    settings = {
+        "clash_socket": CLASH_SOCKET,
+        "clash_transport": config.get_runtime_setting("clash_transport", "unix"),
+        "clash_url": config.get_runtime_setting("clash_url", "http://127.0.0.1:9090"),
+        "clash_secret": config.get_runtime_setting("clash_secret", ""),
+        "request_timeout": config.get_runtime_setting("request_timeout", 10),
+    }
+    return controller_request(settings, path, method, data)
 
 
 def get_clash_mode():
@@ -276,10 +278,8 @@ def _get_token():
 # ─── HTTP 会话（curl_cffi 封装）────────────────────────────
 
 def _make_session():
-    from curl_cffi import requests as cffi_requests
-    session = cffi_requests.Session(impersonate="chrome136")
-    session.proxies = {"https": PROXY_URL, "http": PROXY_URL}
-    return session
+    from promo_dashboard.network import api_session
+    return api_session(PROXY_URL)
 
 
 def _headers():
@@ -311,7 +311,7 @@ def try_checkout(code, country, currency):
     try:
         resp = session.post(
             "https://chatgpt.com/backend-api/payments/checkout",
-            json=payload, headers=_headers(), timeout=20
+            json=payload, headers=_headers(), timeout=config.get_runtime_setting("request_timeout", 20)
         )
         data = resp.json()
         url = data.get("url") or ""
@@ -335,7 +335,7 @@ def fetch_metadata(code):
     session = _make_session()
     url = f"https://chatgpt.com/backend-api/promotions/metadata/{code}?type=promo"
     try:
-        resp = session.get(url, headers=_headers(), timeout=15)
+        resp = session.get(url, headers=_headers(), timeout=config.get_runtime_setting("request_timeout", 15))
         data = resp.json()
         meta = data.get("metadata") or data
         _metadata_cache[code] = meta
@@ -362,7 +362,7 @@ def get_base_checkout(country, currency):
     try:
         resp = session.post(
             "https://chatgpt.com/backend-api/payments/checkout",
-            json=payload, headers=_headers(), timeout=20
+            json=payload, headers=_headers(), timeout=config.get_runtime_setting("request_timeout", 20)
         )
         return resp.json()
     except Exception:

@@ -13,6 +13,10 @@ venv/
 # 配置（含 token）
 config.toml
 .env
+.dashboard/
+.pytest_cache/
+.ruff_cache/
+test-artifacts/
 
 # IDE
 .vscode/

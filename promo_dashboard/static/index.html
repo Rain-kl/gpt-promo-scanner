@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Promo Scanner · 扫描工作台</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+<svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 3 7M3 4v7h7M12 7v5l3 2"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4h7a3 3 0 0 1 3 3v14a4 4 0 0 0-4-3H4zM14 7a3 3 0 0 1 3-3h3v14h-2a4 4 0 0 0-4 3"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M14 3h7v7M21 3 11 13M10 5H4v15h15v-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7a9 9 0 1 0 1 9M20 2v6h-6"/></symbol>
+</svg>
+<a class="skip-link" href="#main">跳到主要内容</a>
+<div class="app-shell">
+  <aside class="sidebar" aria-label="主导航">
+    <a class="brand" href="#workspace" aria-label="Promo Scanner 工作台">
+      <svg viewBox="0 0 36 36" aria-hidden="true" class="brand-mark"><path d="M12 5H5v7m19-7h7v7M5 24v7h7m19-7v7h-7"/><path d="M11 18h14M18 11v14"/></svg>
+      <span>Promo<span class="brand-sub">Scanner</span></span>
+    </a>
+    <nav class="nav">
+      <a href="#workspace" data-route="workspace"><svg class="icon"><use href="#i-grid"/></svg><span>扫描工作台</span></a>
+      <a href="#history" data-route="history"><svg class="icon"><use href="#i-history"/></svg><span>任务记录</span><span id="history-count" class="nav-count" hidden></span></a>
+      <a href="#catalog" data-route="catalog"><svg class="icon"><use href="#i-book"/></svg><span>已知码库</span></a>
+      <a href="#settings" data-route="settings"><svg class="icon"><use href="#i-settings"/></svg><span>连接设置</span><span id="settings-dot" class="status-dot warning" aria-label="尚未配置 Token" hidden></span></a>
+    </nav>
+    <div class="sidebar-foot"><span class="local-label"><span class="status-dot" id="connection-dot"></span><span id="connection-label">连接面板中</span></span><p>本机私有工作空间</p><span class="version">v0.2 · uv + Python</span></div>
+  </aside>
+  <main id="main" tabindex="-1">
+    <header class="page-header"><div><h1 id="page-title">扫描工作台</h1><p id="page-description">从候选到结果，每一步都看得见。</p></div><span class="environment-tag"><span class="status-dot"></span>本机运行</span></header>
+    <div id="page-error" class="notice error" role="alert" hidden><svg class="icon"><use href="#i-info"/></svg><span id="page-error-text"></span><button id="retry-button" class="btn small">重新连接</button></div>
+    <div id="loading" class="loading-state" role="status"><div class="skeleton-line"></div><div class="skeleton-block"></div><p>正在读取配置和任务记录…</p></div>
+
+    <section id="page-workspace" class="page" hidden aria-label="扫描工作台">
+      <div id="setup-notice" class="notice" hidden><svg class="icon"><use href="#i-info"/></svg><span>还没有配置 Token。你可以先预览候选码，或完成连接设置后开始扫描。</span><a href="#settings" class="text-link">去配置<svg class="icon"><use href="#i-arrow"/></svg></a></div>
+      <div class="workspace-grid">
+        <section class="task-builder panel" aria-labelledby="builder-title"><div class="section-heading"><h2 id="builder-title">创建任务</h2><span class="muted">选择一次扫描的范围</span></div>
+          <form id="job-form">
+            <div class="field"><label for="job-mode">任务类型</label><select id="job-mode" name="mode"><option value="discover">候选发现</option><option value="scan">已知码扫描</option><option value="matrix">矩阵发现</option></select><p class="field-help" id="mode-help"></p></div>
+            <div class="field"><label for="job-region">目标地区</label><select id="job-region" name="region"></select><p class="field-help" id="region-help">地区用于生成后缀与选择节点。</p></div>
+            <label class="check-row" id="job-price-row"><input type="checkbox" id="job-price" checked><span>收集价格信息<small>生成结账链接，并读取折扣估算</small></span></label>
+            <div class="task-meta"><span id="task-delay">请求间隔 —</span><a href="#settings" class="text-link">调整扫描设置</a></div>
+            <div class="button-row"><button type="button" class="btn" id="preview-button"><svg class="icon"><use href="#i-eye"/></svg>预览候选</button><button type="submit" class="btn primary" id="start-button"><svg class="icon"><use href="#i-play"/></svg><span id="start-label">开始任务</span></button></div>
+            <p id="job-form-error" class="form-error" role="alert" hidden></p>
+          </form>
+        </section>
+        <section class="run-panel panel" aria-labelledby="run-heading">
+          <div class="section-heading"><h2 id="run-heading">执行状态</h2><span id="run-status" class="badge neutral">等待任务</span></div>
+          <div id="run-empty" class="run-empty"><svg class="empty-icon"><use href="#i-play"/></svg><h3>准备好，开始一次探索</h3><p>预览无需 Token 或代理。真实扫描开始后，进度、日志和结果会在这里更新。</p></div>
+          <div id="run-details" hidden>
+            <div class="run-context"><strong id="run-title"></strong><span id="run-id" class="mono muted"></span></div>
+            <div class="progress-heading"><span id="run-current">准备执行</span><strong id="run-progress-text">0 / 0</strong></div>
+            <progress id="run-progress" max="1" value="0" aria-label="任务执行进度"></progress>
+            <dl class="run-stats"><div><dt>可用</dt><dd id="stat-eligible">0</dd></div><div><dt>存在</dt><dd id="stat-exists">0</dd></div><div><dt>异常 / 跳过</dt><dd id="stat-errors">0</dd></div><div><dt>已用时间</dt><dd id="stat-elapsed">0s</dd></div></dl>
+            <div class="run-bottom"><span id="run-note" class="muted"></span><div class="button-row"><button id="pause-button" type="button" class="btn small" hidden><svg class="icon"><use href="#i-pause"/></svg>暂停</button><button id="resume-button" type="button" class="btn small" hidden><svg class="icon"><use href="#i-play"/></svg>继续</button><button id="stop-button" type="button" class="btn small danger" hidden><svg class="icon"><use href="#i-stop"/></svg>停止</button></div></div>
+            <p id="run-error" class="form-error" role="alert" hidden></p>
+          </div>
+        </section>
+      </div>
+      <section class="results-section" aria-labelledby="results-title">
+        <div class="section-heading result-heading"><div><h2 id="results-title">本次结果</h2><p class="muted" id="results-subtitle">任务执行后，结果会保留在任务记录中。</p></div><div class="tabs" role="tablist" aria-label="任务数据"><button id="tab-results" role="tab" aria-selected="true" aria-controls="result-view" tabindex="0">执行结果</button><button id="tab-logs" role="tab" aria-selected="false" aria-controls="log-view" tabindex="-1">运行日志<span id="log-count" class="tab-count">0</span></button></div></div>
+        <div id="result-view" role="tabpanel" aria-labelledby="tab-results">
+          <div class="table-toolbar"><label class="search-field"><svg class="icon"><use href="#i-search"/></svg><input id="result-search" type="search" placeholder="搜索促销码" aria-label="搜索执行结果"></label><select id="result-region" aria-label="按地区筛选执行结果"><option value="">所有地区</option></select><select id="result-status" aria-label="按结果状态筛选"><option value="">所有状态</option><option value="ELIGIBLE">可用</option><option value="EXISTS">存在</option><option value="NOT_FOUND">未找到</option><option value="ERROR">异常</option><option value="SKIPPED">已跳过</option><option value="PREVIEW">待验证</option></select><div class="toolbar-spacer"></div><button class="btn small" id="export-json" disabled><svg class="icon"><use href="#i-download"/></svg>JSON</button><button class="btn small" id="export-csv" disabled>CSV</button></div>
+          <div class="table-scroll"><table class="data-table"><thead><tr><th>促销码</th><th>地区</th><th>状态</th><th>估算税前 / 月</th><th>说明</th><th class="align-right">操作</th></tr></thead><tbody id="result-body"></tbody></table></div>
+          <div id="results-empty" class="table-empty"><svg class="empty-icon"><use href="#i-search"/></svg><h3>让第一份结果出现在这里</h3><p>选择任务与地区，点击「预览候选」查看待验证列表。</p></div>
+          <div class="pagination" id="result-pagination" hidden><span id="result-total" class="muted"></span><div class="button-row"><button class="btn small" id="previous-page">上一页</button><span id="page-number"></span><button class="btn small" id="next-page">下一页</button></div></div>
+          <p class="table-note">价格沿用脚本估算，不含税且可能受汇率影响；最终金额以结账页为准。预览候选不代表可用。</p>
+        </div>
+        <div id="log-view" role="tabpanel" aria-labelledby="tab-logs" hidden><div class="log-toolbar"><span>实时日志 · 仅当前任务</span><label class="check-inline"><input id="follow-logs" type="checkbox" checked>跟随最新</label></div><div id="log-stream" class="log-stream" tabindex="0" aria-label="任务日志"><p class="log-placeholder">任务开始后，运行日志将显示在这里。</p></div></div>
+      </section>
+    </section>
+
+    <section id="page-history" class="page" hidden aria-label="任务记录"><div class="table-toolbar"><p class="muted">保留进度、日志和已产生的结果，包括停止与失败的任务。</p><div class="toolbar-spacer"></div><a href="#workspace" class="btn primary"><svg class="icon"><use href="#i-play"/></svg>创建任务</a></div><div class="table-scroll"><table class="data-table"><thead><tr><th>任务</th><th>状态</th><th>已处理</th><th>可用 / 存在</th><th>开始时间</th><th class="align-right">操作</th></tr></thead><tbody id="history-body"></tbody></table></div><div id="history-empty" class="table-empty"><svg class="empty-icon"><use href="#i-history"/></svg><h3>你的扫描记录，从这里开始</h3><p>完成一次候选预览或扫描，就能在这里回看执行过程。</p><a href="#workspace" class="btn">创建第一个任务</a></div></section>
+
+    <section id="page-catalog" class="page" hidden aria-label="已知码库"><div class="notice"><svg class="icon"><use href="#i-info"/></svg><span id="catalog-notice">仓库历史参考数据，尚未在当前环境重新验证。</span></div><div class="table-toolbar"><label class="search-field"><svg class="icon"><use href="#i-search"/></svg><input id="catalog-search" type="search" placeholder="搜索公司或促销码" aria-label="搜索已知码库"></label><select id="catalog-region" aria-label="按地区筛选已知码库"></select><div class="toolbar-spacer"></div><span id="catalog-count" class="muted"></span></div><div class="table-scroll"><table class="data-table"><thead><tr><th>促销码 / 公司</th><th>地区</th><th>历史状态</th><th>历史月付 ≈ USD</th><th>历史折扣</th><th class="align-right">操作</th></tr></thead><tbody id="catalog-body"></tbody></table></div><div id="catalog-empty" class="table-empty" hidden><h3>没有匹配的参考码</h3><p>试试其他地区或搜索词。</p></div></section>
+
+    <section id="page-settings" class="page" hidden aria-label="连接设置">
+      <div class="settings-intro"><p>在这里完成配置，无需编辑文件。保存后的设置用于新任务，正在运行的任务继续使用启动时的配置。</p><span id="settings-saved-state" class="badge neutral">读取中</span></div>
+      <form id="settings-form">
+        <section class="settings-group"><div class="settings-group-heading"><h2>ChatGPT 连接</h2><p>使用你自己账号的登录凭据，执行前会验证 Token。</p></div><div class="settings-fields"><div class="field"><label for="setting-token">Access Token <span id="token-status" class="inline-state"></span></label><input id="setting-token" type="password" autocomplete="new-password" placeholder="粘贴新的 Token；留空保留已有值"><p class="field-help">登录 ChatGPT 后，从 <a class="text-link" href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer">会话页面<svg class="icon"><use href="#i-link"/></svg></a> 获取 accessToken。凭据仅保存在本机，不会出现在日志和导出中。</p><label class="check-inline"><input id="clear-token" type="checkbox">清除已保存的 Token</label></div><div class="field"><label for="setting-proxy">出站代理地址</label><input id="setting-proxy" type="url" placeholder="http://127.0.0.1:7890"><p class="field-help">支持 HTTP、HTTPS、SOCKS5。留空直连；不支持在地址中嵌入密码。</p></div></div></section>
+        <section class="settings-group"><div class="settings-group-heading"><h2>Clash 控制器</h2><p>自动切换地区节点时需要。支持本机 Socket 和 HTTP API。</p><button id="check-connections" type="button" class="btn small"><svg class="icon"><use href="#i-refresh"/></svg>检查已保存的连接</button><p id="connection-check-result" class="field-help" role="status" hidden></p></div><div class="settings-fields"><label class="check-row"><input type="checkbox" id="setting-auto-switch"><span>自动切换节点<small>仅影响「已知码扫描」；关闭后使用当前出站连接</small></span></label><div class="field"><label for="setting-transport">控制器连接方式</label><select id="setting-transport"><option value="unix">Unix Socket</option><option value="http">HTTP API</option></select></div><div class="field" id="socket-field"><label for="setting-socket">Socket 路径</label><input id="setting-socket" placeholder="/tmp/verge/verge-mihomo.sock"></div><div class="field" id="clash-url-field" hidden><label for="setting-clash-url">控制器地址</label><input id="setting-clash-url" type="url" placeholder="http://127.0.0.1:9090"></div><div class="field"><label for="setting-clash-secret">API 密钥 <span id="clash-secret-status" class="inline-state"></span></label><input id="setting-clash-secret" type="password" autocomplete="new-password" placeholder="可选；留空保留已有值"><label class="check-inline"><input id="clear-clash-secret" type="checkbox">清除已保存的密钥</label></div><div class="field-pair"><div class="field"><label for="setting-rule-group">Rule 模式代理组</label><input id="setting-rule-group" required maxlength="200"></div><div class="field"><label for="setting-global-group">Global 模式代理组</label><input id="setting-global-group" required maxlength="200"></div></div><details class="advanced-details"><summary>各地区节点匹配关键字</summary><p class="field-help">用逗号分隔；留空使用内置关键字。任务会选择匹配且延迟可用的节点。</p><div id="keyword-fields" class="keyword-grid"></div></details></div></section>
+        <section class="settings-group"><div class="settings-group-heading"><h2>扫描偏好</h2><p>配置请求节奏、默认任务及候选来源。</p></div><div class="settings-fields"><div class="field-pair"><div class="field"><label for="setting-delay">请求间隔 / 秒</label><input id="setting-delay" type="number" min="0.15" max="60" step="0.05" required><p class="field-help">范围 0.15–60 秒</p></div><div class="field"><label for="setting-timeout">请求超时 / 秒</label><input id="setting-timeout" type="number" min="5" max="120" step="1" required><p class="field-help">范围 5–120 秒</p></div></div><div class="field-pair"><div class="field"><label for="setting-mode">默认任务类型</label><select id="setting-mode"><option value="discover">候选发现</option><option value="scan">已知码扫描</option><option value="matrix">矩阵发现</option></select></div><div class="field"><label for="setting-region">默认地区</label><select id="setting-region"></select></div></div><label class="check-row"><input id="setting-price" type="checkbox"><span>默认收集价格<small>仅用于已知码扫描</small></span></label><label class="check-row"><input id="setting-bases" type="checkbox"><span>使用内置公司基础名<small>候选发现和矩阵任务会组合基础名与国家后缀</small></span></label><label class="check-row"><input id="setting-companies" type="checkbox"><span>加入内置公司候选列表<small>仅用于候选发现；英国列表较大，单次最多 5000 条候选</small></span></label><div class="field"><label for="setting-codes">自定义候选码</label><textarea id="setting-codes" rows="4" placeholder="每行一个完整候选码，例如 mycompanygb"></textarea><p class="field-help">追加到所选地区的任务。支持字母、数字、下划线、连字符。</p></div><div class="field"><label for="setting-custom-bases">自定义公司基础名</label><textarea id="setting-custom-bases" rows="3" placeholder="每行一个基础名，例如 mycompany"></textarea><p class="field-help">发现任务自动附加国家后缀；英国同时尝试 gb 和 uk。</p></div></div></section>
+        <div class="settings-footer"><span class="muted" id="settings-footnote">所有配置保存在本机工作空间。</span><button type="submit" class="btn primary" id="save-settings"><svg class="icon"><use href="#i-check"/></svg>保存设置</button></div><p id="settings-error" class="form-error" role="alert" hidden></p>
+      </form>
+    </section>
+    <footer class="page-footer"><span>Promo Scanner</span><span>连接、执行、结果 · 尽在工作台</span></footer>
+  </main>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

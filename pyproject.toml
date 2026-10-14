@@ -1,0 +1,30 @@
+[project]
+name = "gpt-promo-scanner"
+version = "0.2.0"
+description = "ChatGPT promo scanner with a local web control panel"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "curl-cffi>=0.13,<1",
+  "fastapi>=0.115,<1",
+  "httpx>=0.27,<1",
+  "uvicorn>=0.30,<1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "playwright>=1.51,<2", "ruff>=0.11,<1"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+include = ["promo_dashboard/**/*.py", "tests/**/*.py", "config.py"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
